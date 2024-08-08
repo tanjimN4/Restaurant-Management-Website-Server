@@ -33,9 +33,10 @@ async function run() {
 
     const itemsCollection = client.db('Assignment').collection('items')
     const purchaseCollection = client.db('Assignment').collection('purchase')
+    const galleryCollection = client.db('Assignment').collection('gallery')
 
     app.get('/items',async(req,res)=>{
-        const data =itemsCollection.find().limit(6)
+        const data =itemsCollection.find().sort({ count: -1 }).limit(6)
         const result =await data.toArray()
         res.send(result)
     })
@@ -43,6 +44,62 @@ async function run() {
         const data =itemsCollection.find()
         const result =await data.toArray()
         res.send(result)
+    })
+    app.get('/gallery',async(req,res)=>{
+      let query={}
+      if(req.query?.email){
+        query={email:req.query.email}
+      }
+        const data =galleryCollection.find(query)
+        const result =await data.toArray()
+        res.send(result)
+    })
+    app.post('/gallery/add',async(req,res)=>{
+      const { name, image,description,email } = req.body;
+
+      const newFoodItem = {
+        name,
+        image,
+        description,
+        email
+      };
+
+      const result =await galleryCollection.insertOne(newFoodItem)
+
+      res.send(result)
+    })
+    app.put('/itemsAllCount/:id',async(req,res)=>{
+      const {id}=req.params
+      const {count,quantity}=req.body
+
+      const options = { upsert: false }
+      
+      const query ={_id: new ObjectId(id)}
+      countUpdate={ $inc: { count: count,quantity:-quantity} }
+  
+      const result =await itemsCollection.updateOne(query,countUpdate,options)
+      res.send(result)
+        
+    })
+    app.put('/update/:id',async(req,res)=>{
+      const { id } = req.params;
+      const { name, price, description,category } = req.body
+
+
+      const options = { upsert: false }
+      const query = { _id: new ObjectId(id) }
+
+      const updateDoc = {
+        $set: {
+          name,
+          price,
+          description,
+          category,
+        },
+      };
+
+      const result = await itemsCollection.updateOne(query, updateDoc,options)
+      res.send(result)
     })
     app.get('/itemsAll/email',async(req,res)=>{
 
@@ -67,10 +124,10 @@ async function run() {
       const result =await purchaseCollection.insertOne(purchase)
       res.send(result)
     })
-    app.post('/purchase/data',async(req,res)=>{
+    app.delete('/purchase/:id',async(req,res)=>{
       const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await purchaseCollection.deleteOne(query);
+      const query = { _id: new ObjectId(id) }
+      const result = await purchaseCollection.deleteOne(query)
       res.send(result)
     })
 
@@ -97,7 +154,7 @@ async function run() {
         email,
         origin,
         description,
-        date: new Date(),
+        count: 0
       };
 
       const result =await itemsCollection.insertOne(newFoodItem)
