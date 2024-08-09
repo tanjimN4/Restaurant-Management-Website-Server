@@ -10,10 +10,10 @@ const port =process.env.PORT || 5000
 
 //middleware
 app.use(cors({
-  origin:'https://restaurant-management-79b97.web.app',
-  
+  origin: 'https://restaurant-management-79b97.web.app',
   credentials: true,
 }));
+
 app.use(express.json())
 app.use(cookieParser())
 
@@ -199,7 +199,8 @@ async function run() {
     app.post('/jwt',async(req,res)=>{
       const user =req.body
       const token =jwt.sign(user,process.env.SECRET_TOKEN,{expiresIn:'1h'})
-      res.cookie('token',token,{httpOnly:true,secure:true,sameSite:'none'})
+      res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'None' });
+
       res.send({success:true})
     })
 
