@@ -10,7 +10,7 @@ const port =process.env.PORT || 5000
 
 //middleware
 app.use(cors({
-  origin:'https://restaurant-management-79b97.web.app/',
+  origin:'https://restaurant-management-79b97.web.app',
   
   credentials: true,
 }));
