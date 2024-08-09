@@ -10,7 +10,9 @@ const port =process.env.PORT || 5000
 
 //middleware
 app.use(cors({
-  origin:[,'https://restaurant-management-79b97.web.app'],
+  origin:['https://restaurant-management-79b97.web.app/',
+    'https://restaurant-management-79b97.firebaseapp.com/'
+  ],
   
   credentials: true,
 }));
@@ -64,7 +66,7 @@ async function run() {
         const result =await data.toArray()
         res.send(result)
     })
-    app.get('/itemsAll',userlog,async(req,res)=>{
+    app.get('/itemsAll',async(req,res)=>{
       // console.log(req.cookies);
         const data =itemsCollection.find()
         const result =await data.toArray()
@@ -199,7 +201,7 @@ async function run() {
     app.post('/jwt',async(req,res)=>{
       const user =req.body
       const token =jwt.sign(user,process.env.SECRET_TOKEN,{expiresIn:'1h'})
-      res.cookie('token',token,{httpOnly:true,secure:true,sameSite:'none'})
+      res.cookie('token',token,{httpOnly:false,secure:true,sameSite:'none'})
       res.send({success:true})
     })
 
