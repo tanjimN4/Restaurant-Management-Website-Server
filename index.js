@@ -54,7 +54,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const itemsCollection = client.db('Assignment').collection('items')
     const purchaseCollection = client.db('Assignment').collection('purchase')
@@ -201,7 +201,7 @@ async function run() {
     app.post('/jwt',async(req,res)=>{
       const user =req.body
       const token =jwt.sign(user,process.env.SECRET_TOKEN,{expiresIn:'1h'})
-      res.cookie('token',token,{httpOnly:false,secure:true,sameSite:'none'})
+      res.cookie('token',token,{httpOnly:true,secure:true,sameSite:'none'})
       res.send({success:true})
     })
 
