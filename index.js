@@ -1,38 +1,52 @@
-const express =require('express');
+const express = require('express');
 const cors = require('cors');
-const jwt=require('jsonwebtoken')
-const cookieParser=require('cookie-parser')
+const jwt = require('jsonwebtoken')
+const cookieParser = require('cookie-parser')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
-const app =express()
+const app = express()
+const admin = require('firebase-admin');
 
-const port =process.env.PORT || 5000
+
+const port = process.env.PORT || 5000
 
 //middleware
 app.use(cors({
-  origin: 'https://restaurant-management-79b97.web.app',
+  origin: 'http://localhost:5174',
   credentials: true,
 }));
+
 
 app.use(express.json())
 app.use(cookieParser())
 
-const userlog =(req,res,next)=>{
-  console.log(req.method,req.url);
+const userlog = (req, res, next) => {
+  console.log(req.method, req.url);
 
   next()
 }
-const tokenVerefy =(req,res,next)=>{
-  const token=req.cookies?.token
+admin.initializeApp({
+  credential: admin.credential.cert({
+    project_id: process.env.FIREBASE_PROJECT_ID,
+    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+    private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    client_email: process.env.FIREBASE_CLIENT_EMAIL,
+    client_id: process.env.FIREBASE_CLIENT_ID,
+    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+    client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL
+  })
+});
+const tokenVerefy = (req, res, next) => {
+  const token = req.cookies?.token
   // console.log(token);
-  if(!token){
-    return res.status(401).send({message:'unauthorized access'})
+  if (!token) {
+    return res.status(401).send({ message: 'unauthorized access' })
   }
-  jwt.verify(token,process.env.SECRET_TOKEN,(err,decoded)=>{
-    if(err){
-      return res.send({message: 'unauthorized access'})
+  jwt.verify(token, process.env.SECRET_TOKEN, (err, decoded) => {
+    if (err) {
+      return res.send({ message: 'unauthorized access' })
     }
-    req.user=decoded
+    req.user = decoded
     next()
   })
   // next()
@@ -58,29 +72,50 @@ async function run() {
     const purchaseCollection = client.db('Assignment').collection('purchase')
     const galleryCollection = client.db('Assignment').collection('gallery')
 
-    app.get('/items',async(req,res)=>{
-        const data =itemsCollection.find().sort({ count: -1 }).limit(6)
-        const query={}
-        const result =await data.toArray()
-        res.send(result)
+    app.get('/items', async (req, res) => {
+      const data = itemsCollection.find().sort({ count: -1 }).limit(6)
+      const query = {}
+      const result = await data.toArray()
+      res.send(result)
     })
-    app.get('/itemsAll',async(req,res)=>{
-      // console.log(req.cookies);
-        const data =itemsCollection.find()
-        const result =await data.toArray()
-        res.send(result)
-    })
-    app.get('/gallery',tokenVerefy,async(req,res)=>{
-      let query={}
-      if(req.query?.email){
-        query={email:req.query.email}
+    app.get('/api/users', async (req, res) => {
+      try {
+        const listUsersResult = await admin.auth().listUsers();
+        const users = listUsersResult.users.map(userRecord => userRecord.toJSON());
+        res.json(users);
+      } catch (error) {
+        console.error('Error listing users:', error);
+        res.status(500).send('Error listing users');
       }
-        const data =galleryCollection.find(query)
-        const result =await data.toArray()
-        res.send(result)
+    });
+    app.delete('/api/users/:uid', async (req, res) => {
+      const { uid } = req.params;
+    
+      try {
+        await admin.auth().deleteUser(uid);
+        res.status(200).send({ message: 'User deleted successfully.' });
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).send({ error: 'Failed to delete user.' });
+      }
+    });
+    app.get('/itemsAll', async (req, res) => {
+      // console.log(req.cookies);
+      const data = itemsCollection.find()
+      const result = await data.toArray()
+      res.send(result)
     })
-    app.post('/gallery/add',async(req,res)=>{
-      const { name, image,description,email } = req.body;
+    app.get('/gallery', tokenVerefy, async (req, res) => {
+      let query = {}
+      if (req.query?.email) {
+        query = { email: req.query.email }
+      }
+      const data = galleryCollection.find(query)
+      const result = await data.toArray()
+      res.send(result)
+    })
+    app.post('/gallery/add', async (req, res) => {
+      const { name, image, description, email } = req.body;
 
       const newFoodItem = {
         name,
@@ -89,27 +124,27 @@ async function run() {
         email
       };
 
-      const result =await galleryCollection.insertOne(newFoodItem)
+      const result = await galleryCollection.insertOne(newFoodItem)
 
       res.send(result)
     })
-    app.put('/itemsAllCount/:id',async(req,res)=>{
-      const {id}=req.params
-      const {count,updateQuantity}=req.body
+    app.put('/itemsAllCount/:id', async (req, res) => {
+      const { id } = req.params
+      const { count, updateQuantity } = req.body
       // console.log(updateQuantity);
 
       const options = { upsert: false }
-      
-      const query ={_id: new ObjectId(id)}
-      countUpdate={ $inc: { count: count},$set:{quantity:updateQuantity} }
-  
-      const result =await itemsCollection.updateOne(query,countUpdate,options)
+
+      const query = { _id: new ObjectId(id) }
+      countUpdate = { $inc: { count: count }, $set: { quantity: updateQuantity } }
+
+      const result = await itemsCollection.updateOne(query, countUpdate, options)
       res.send(result)
-        
+
     })
-    app.put('/update/:id',async(req,res)=>{
+    app.put('/update/:id', async (req, res) => {
       const { id } = req.params;
-      const { name, price, description,category } = req.body
+      const { name, price, description, category } = req.body
 
 
       const options = { upsert: false }
@@ -124,59 +159,59 @@ async function run() {
         },
       };
 
-      const result = await itemsCollection.updateOne(query, updateDoc,options)
+      const result = await itemsCollection.updateOne(query, updateDoc, options)
       res.send(result)
     })
-    app.get('/itemsAll/email',async(req,res)=>{
+    app.get('/itemsAll/email', async (req, res) => {
 
-      let query={}
-      if(req.query?.email){
-        query={email:req.query.email}
+      let query = {}
+      if (req.query?.email) {
+        query = { email: req.query.email }
       }
-        const data =itemsCollection.find(query)
-        const result =await data.toArray()
-        res.send(result)
-    })
-
-    app.get('/singlefood/:id',async(req,res)=>{
-      const id=req.params.id
-      const query ={_id: new ObjectId(id)}
-      const result=await itemsCollection.findOne(query)
-      res.send(result)
-    })
-    app.get('/purchase/new/:id',tokenVerefy,async(req,res)=>{
-      const id=req.params.id
-      const query ={_id: new ObjectId(id)}
-      const result=await itemsCollection.findOne(query)
+      const data = itemsCollection.find(query)
+      const result = await data.toArray()
       res.send(result)
     })
 
-    app.post('/purchase/data',async(req,res)=>{
+    app.get('/singlefood/:id', async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await itemsCollection.findOne(query)
+      res.send(result)
+    })
+    app.get('/purchase/new/:id', tokenVerefy, async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await itemsCollection.findOne(query)
+      res.send(result)
+    })
+
+    app.post('/purchase/data', async (req, res) => {
       // if(req.user.email!==req.query.email){
       //   return res.status(403).send({message:'you cant access it'})
       // }
-      const purchase =req.body
-      const result =await purchaseCollection.insertOne(purchase)
+      const purchase = req.body
+      const result = await purchaseCollection.insertOne(purchase)
       res.send(result)
     })
-    app.delete('/purchase/:id',async(req,res)=>{
+    app.delete('/purchase/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await purchaseCollection.deleteOne(query)
       res.send(result)
     })
 
-    app.get('/purchase/data/email',async(req,res)=>{
+    app.get('/purchase/data/email', async (req, res) => {
 
-      let query={}
-      if(req.query?.email){
-        query={email:req.query.email}
+      let query = {}
+      if (req.query?.email) {
+        query = { email: req.query.email }
       }
-        const data =purchaseCollection.find(query)
-        const result =await data.toArray()
-        res.send(result)
+      const data = purchaseCollection.find(query)
+      const result = await data.toArray()
+      res.send(result)
     })
-    app.post('/addfood',tokenVerefy,async(req,res)=>{
+    app.post('/addfood', tokenVerefy, async (req, res) => {
       const { name, image, category, quantity, price, addedBy, email, origin, description } = req.body;
 
       const newFoodItem = {
@@ -192,21 +227,21 @@ async function run() {
         count: 0
       };
 
-      const result =await itemsCollection.insertOne(newFoodItem)
+      const result = await itemsCollection.insertOne(newFoodItem)
 
       res.send(result)
     })
-    app.post('/jwt',async(req,res)=>{
-      const user =req.body
-      const token =jwt.sign(user,process.env.SECRET_TOKEN,{expiresIn:'1h'})
+    app.post('/jwt', async (req, res) => {
+      const user = req.body
+      const token = jwt.sign(user, process.env.SECRET_TOKEN, { expiresIn: '1h' })
       res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'None' });
 
-      res.send({success:true})
+      res.send({ success: true })
     })
 
-    app.post('/logout',async(req,res)=>{
-      const user=req.body
-      res.clearCookie('token',{maxAge:0}).send({success:true})
+    app.post('/logout', async (req, res) => {
+      const user = req.body
+      res.clearCookie('token', { maxAge: 0 }).send({ success: true })
     })
 
     // Send a ping to confirm a successful connection
@@ -220,10 +255,10 @@ async function run() {
 run().catch(console.dir);
 
 
-app.get('/',(req,res)=>{
-    res.send('working')
+app.get('/', (req, res) => {
+  res.send('working')
 })
 
-app.listen(port,()=>{
-    console.log(`running ${port}`);  
+app.listen(port, () => {
+  console.log(`running ${port}`);
 })
