@@ -12,7 +12,7 @@ const port = process.env.PORT || 5000
 
 //middleware
 app.use(cors({
-  origin: 'http://localhost:5174',
+  origin: 'https://restaurant-management-website-server-omega.vercel.app',
   credentials: true,
 }));
 
